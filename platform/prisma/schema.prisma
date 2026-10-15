@@ -1,0 +1,147 @@
+// Production Prisma schema (Postgres). The local MVP runs on a zero-config
+// JSON store (data/*.json) with identical domain rules; migrate to this schema
+// for concurrency-safe capacity (transactions + row locking) and scale.
+// See docs/DECISIONS.md.
+
+generator client { provider = "prisma-client-js" }
+
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+
+enum EventType { workshop event lecture field_trip }
+enum EventStatus { draft published cancelled }
+enum RegistrationType { participant volunteer }
+enum RegistrationStatus { pending confirmed waitlist cancelled attended }
+enum AdminRole { super_admin editor }
+
+model Event {
+  id                 String      @id @default(cuid())
+  title              String
+  titleAr            String?
+  slug               String      @unique
+  type               EventType
+  shortDescription   String
+  shortDescriptionAr String?
+  description        String      @db.Text
+  coverGradient      String      @default("g-event-1")
+  startDatetime      DateTime
+  endDatetime        DateTime
+  locationName       String
+  locationAddress    String?
+  mapUrl             String?
+  price              Decimal     @default(0) @db.Decimal(10, 2)
+  capacity           Int?
+  volunteerCapacity  Int?
+  allowRegistration  Boolean     @default(true)
+  allowVolunteers    Boolean     @default(false)
+  speakerName        String?
+  status             EventStatus @default(draft)
+  isFeatured         Boolean     @default(false)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  registrations      Registration[]
+
+  @@index([type, status, endDatetime])
+  @@index([slug])
+}
+
+model Registration {
+  id                   String             @id @default(cuid())
+  eventId              String
+  event                Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registrationType     RegistrationType
+  fullName             String
+  email                String
+  phone                String
+  age                  Int?
+  city                 String?
+  numberOfAttendees    Int                @default(1)
+  experienceLevel      String?
+  specialRequirements  String?            @db.Text
+  volunteerRole        String?
+  volunteerSkills      String?            @db.Text
+  volunteerExperience  String?            @db.Text
+  volunteerAvailability Json?
+  tshirtSize           String?
+  emergencyContact     String?
+  heardAboutUs         String?
+  notes                String?            @db.Text
+  consentAt            DateTime
+  status               RegistrationStatus @default(pending)
+  createdAt            DateTime           @default(now())
+
+  @@unique([eventId, email, registrationType])
+  @@index([eventId])
+}
+
+model PrivateEventRequest {
+  id                     String   @id @default(cuid())
+  contactName            String
+  jobTitle               String?
+  email                  String
+  phone                  String
+  preferredContactMethod String?
+  companyName            String
+  industry               String?
+  companyWebsite         String?
+  companySize            String?
+  eventType              String
+  eventTypeOther         String?
+  eventTitle             String?
+  eventDescription       String   @db.Text
+  preferredDate          DateTime
+  alternativeDate        DateTime?
+  flexibleDate           Boolean  @default(false)
+  expectedGuests         String
+  locationType           String?
+  locationCity           String?
+  servicesNeeded         Json     @default("[]")
+  budgetRange            String?
+  attachments            Json     @default("[]")
+  notes                  String?  @db.Text
+  heardAboutUs           String?
+  consentAt              DateTime
+  status                 String   @default("new")
+  adminNotes             String?  @db.Text
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([status])
+}
+
+model Admin {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         AdminRole @default(editor)
+  createdAt    DateTime  @default(now())
+}
+
+model Application {
+  id           String   @id @default(cuid())
+  fullName     String
+  age          Int
+  city         String
+  phone        String
+  email        String
+  university   String?
+  major        String?
+  motivation   String   @db.Text
+  skill        String   @db.Text
+  areas        Json     @default("[]")
+  achievement  String   @db.Text
+  hours        String
+  priorTeam    String
+  priorDetails String?  @db.Text
+  tools        String   @db.Text
+  valueAdd     String   @db.Text
+  links        String?
+  agreement    String
+  eventId      String?
+  eventTitle   String?
+  registrationType String?
+  status       String   @default("new")
+  createdAt    DateTime @default(now())
+
+  @@index([status])
+}
